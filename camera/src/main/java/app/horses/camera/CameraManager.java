@@ -2,12 +2,12 @@ package app.horses.camera;
 
 import android.app.Activity;
 import android.app.Application;
-import android.content.Context;
 import android.content.Intent;
 import android.support.annotation.ColorRes;
 import android.support.annotation.StringRes;
 
 import app.horses.camera.ui.activity.TakeActivity;
+import app.horses.camera.util.Constants;
 import app.horses.camera.util.Methods;
 
 import static app.horses.camera.util.Constants.REQUEST_TAKE;
@@ -42,8 +42,13 @@ public class CameraManager {
 
 
     public static void openCamera(Activity activity) {
-
         activity.startActivityForResult(new Intent(activity, TakeActivity.class), REQUEST_TAKE);
+    }
+
+    public static void openCamera(Activity activity,String path) {
+        Intent intent=new Intent(activity, TakeActivity.class);
+        intent.putExtra(Constants.EXTRA_FOLDER_PATH,path);
+        activity.startActivityForResult(intent, REQUEST_TAKE);
     }
 
     public static void init(CameraManager cameraManager) {

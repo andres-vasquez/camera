@@ -1,48 +1,38 @@
 package app.horses.camera.ui.activity;
 
+import android.Manifest;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.BitmapRegionDecoder;
-import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.hardware.Camera;
 import android.os.AsyncTask;
 import android.os.Build;
-import android.os.Environment;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.WindowManager;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Interpolator;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
-import android.widget.TextView;
-import android.widget.Toast;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -55,16 +45,20 @@ import java.util.List;
 import app.horses.camera.R;
 import app.horses.camera.util.CameraUtil;
 import app.horses.camera.util.ColorUtils;
+import app.horses.camera.util.Constants;
 import app.horses.camera.util.Methods;
 import app.horses.camera.util.SimpleAnimatorListener;
+import pub.devrel.easypermissions.AfterPermissionGranted;
+import pub.devrel.easypermissions.EasyPermissions;
 
+import static app.horses.camera.util.Constants.EXTRA_FOLDER_PATH;
 import static app.horses.camera.util.Constants.RESULT_ERROR;
-import static app.horses.camera.util.Constants.RESULT_TAKE;
 
 @SuppressWarnings("deprecation")
-public class TakeActivity extends AppCompatActivity implements SurfaceHolder.Callback {
+public class TakeActivity extends AppCompatActivity implements SurfaceHolder.Callback, EasyPermissions.PermissionCallbacks {
 
     private static final String TAG = TakeActivity.class.getSimpleName();
+    private static final int RC_WRITESD_PERMISSIONS_REQUIRED =101;
 
     private static final int PHOTO_SIZE = 1200;
     private static final int MIN_PREVIEW_PIXELS = 480 * 320;
@@ -111,9 +105,22 @@ public class TakeActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private int width = 0;
     private int height = 0;
 
+    private String folderPath;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Intent intent=getIntent();
+        if(intent.hasExtra(Constants.EXTRA_FOLDER_PATH)){
+            folderPath=intent.getStringExtra(EXTRA_FOLDER_PATH);
+        }
+
+        methodRequirePermissions();
+    }
+
+    private void initActivity(){
+
         setContentView(R.layout.activity_take);
 
         // TODO: 18/11/2016 transparent status bar
@@ -125,6 +132,8 @@ public class TakeActivity extends AppCompatActivity implements SurfaceHolder.Cal
             getWindow().setStatusBarColor(Color.TRANSPARENT);*/
             getWindow().setStatusBarColor(CameraUtil.darkenColor(ColorUtils.getPrimaryColor()));
         }
+        //Prevent screen change
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         surface = (SurfaceView) findViewById(R.id.surface);
         layout = (LinearLayout) findViewById(R.id.layout);
@@ -235,8 +244,19 @@ public class TakeActivity extends AppCompatActivity implements SurfaceHolder.Cal
         save.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                File filesDir;
+                if(folderPath!=null){
+                    filesDir = new File(folderPath);
 
-                File f = persistImage(saveBitmap);
+                    //Create folder if not Exists
+                    if(!filesDir.exists()){
+                        filesDir.mkdirs();
+                    }
+                } else {
+                    filesDir = getFilesDir();
+                }
+
+                File f = persistImage(saveBitmap,filesDir);
 
                 Log.i(TAG, "file size: " + (f.length() / 1024) + "kb");
 
@@ -258,9 +278,7 @@ public class TakeActivity extends AppCompatActivity implements SurfaceHolder.Cal
         });
     }
 
-    private File persistImage(Bitmap bitmap) {
-        File filesDir = getFilesDir();
-
+    private File persistImage(Bitmap bitmap, File filesDir) {
         String name = String.format(filesDir  + "/%s.jpg", new Date().getTime());
 
         File imageFile = new File(name);
@@ -807,5 +825,39 @@ public class TakeActivity extends AppCompatActivity implements SurfaceHolder.Cal
         });
 
         animatorSet.start();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        // Forward results to EasyPermissions
+        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
+    }
+
+
+    @AfterPermissionGranted(RC_WRITESD_PERMISSIONS_REQUIRED)
+    private void methodRequirePermissions() {
+        String[] perms = {Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.CAMERA
+        };
+        if (EasyPermissions.hasPermissions(this, perms)) {
+            initActivity();
+        } else {
+            // Do not have permissions, request them now
+            EasyPermissions.requestPermissions(this, "Required permissions",
+                    RC_WRITESD_PERMISSIONS_REQUIRED, perms);
+        }
+    }
+
+    @Override
+    public void onPermissionsGranted(int requestCode, List<String> list) {
+        initActivity();
+    }
+
+    @Override
+    public void onPermissionsDenied(int requestCode, List<String> list) {
+        setResult(RESULT_ERROR);
+        finish();
     }
 }

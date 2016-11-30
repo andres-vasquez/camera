@@ -53,7 +53,12 @@ public class MainActivity extends AppCompatActivity implements CallbackView {
         ...
         /** Open Camera*/
         CameraManager.openCamera(this);
-
+        
+        /** Open Camera and set folder path to save images*/
+        File root = Environment.getExternalStorageDirectory();
+        File dirBase=new File(root, "saved_images");
+        CameraManager.openCamera(this,dirBase.getPath());    
+            
         /** Set Callback*/
         callbackManager.setCallback(this);
     }
